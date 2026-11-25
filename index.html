@@ -37,6 +37,12 @@ main{padding:16px;min-width:0}
 .meta .s{color:var(--mute);font-size:12px;margin-top:2px}
 .meta .snip{font-size:12px;color:var(--mute);margin-top:4px}
 mark{background:var(--hl);color:inherit;border-radius:2px}
+.chip{display:inline-block;font-size:11px;font-weight:600;padding:1px 6px;border-radius:4px;margin-right:6px;background:var(--chip);color:var(--accent)}
+.chip.main{background:var(--line);color:var(--mute)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;border:0;background:var(--bg);color:var(--ink);padding:8px 12px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:var(--accent-ink);font-weight:600}
 #modal{position:fixed;inset:0;background:#000d;display:none;z-index:10;flex-direction:column;align-items:center;justify-content:center;padding:16px}
 #modal.open{display:flex}
 #modal img{max-width:100%;max-height:calc(100vh - 110px);border-radius:6px;background:#fff}
@@ -60,6 +66,7 @@ mark{background:var(--hl);color:inherit;border-radius:2px}
   <h1>Robotaxi Proposal Index</h1>
   <button id="navtoggle">Topics</button>
   <input id="q" type="search" placeholder="Search all slide text… (TTC, PDPA, nuScenes, ค่าใช้จ่าย)" autocomplete="off">
+  <span class="seg" id="scope"><button data-v="all" class="on">All</button><button data-v="main">Main</button><button data-v="app">Appendix</button></span>
   <span class="hint">Slideshow: type the number, then <kbd>Enter</kbd> · <kbd>/</kbd> search</span>
 </header>
 <div class="wrap">
@@ -77,6 +84,12 @@ const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'
 const bySlide = Object.fromEntries(D.slides.map(s => [s.n, s]));
 let filter = null;   // {label, slides:[n...]}
 let shown = [];      // slide numbers currently in the grid
+let scope = "all";   // all | main | app - combines with search and sidebar filter
+document.querySelectorAll("#scope button").forEach(b => b.onclick = () => {
+  scope = b.dataset.v;
+  document.querySelectorAll("#scope button").forEach(x => x.classList.toggle("on", x === b));
+  render();
+});
 
 // sidebar
 const nav = $("#nav");
@@ -108,15 +121,16 @@ function render(){
   const terms = $("#q").value.toLowerCase().split(/\s+/).filter(Boolean);
   let list = filter ? filter.slides.map(n => bySlide[n]).filter(Boolean) : D.slides;
   if (terms.length) {
-    list = D.slides.filter(s => { const hay = (s.t + " " + s.x + " " + s.notes + " " + D.sections[s.s].name).toLowerCase(); return terms.every(t => hay.includes(t)); });
+    list = D.slides.filter(s => { const hay = (s.t + " " + s.x + " " + s.notes + " " + D.sections[s.s].name + (D.sections[s.s].app ? " appendix" : " main")).toLowerCase(); return terms.every(t => hay.includes(t)); });
   }
+  if (scope !== "all") list = list.filter(s => D.sections[s.s].app === (scope === "app"));
   shown = list.map(s => s.n);
-  const what = terms.length ? `matching “${esc(terms.join(" "))}”` : filter ? `for <b>${esc(filter.label)}</b>` : "";
+  const what = (terms.length ? `matching “${esc(terms.join(" "))}”` : filter ? `for <b>${esc(filter.label)}</b>` : "") + (scope === "all" ? "" : ` in <b>${scope === "app" ? "Appendix" : "Main deck"}</b>`);
   $("#status").innerHTML = `${list.length} slide${list.length === 1 ? "" : "s"} ${what}` + (list.length ? ` — numbers: <b>${compact(shown)}</b>` : "");
   $("#grid").innerHTML = list.map(s => `
     <div class="card" data-n="${s.n}">
       <div class="thumb"><img loading="lazy" src="thumbs/${s.n}.jpg" alt=""><span class="num">${s.n}</span>${s.hidden ? '<span class="tag">hidden</span>' : ""}</div>
-      <div class="meta"><div class="t">${esc(s.t)}</div><div class="s">${esc(D.sections[s.s].name)}</div>${terms.length ? `<div class="snip">${snippet(s, terms)}</div>` : ""}</div>
+      <div class="meta"><div class="t">${esc(s.t)}</div><div class="s">${D.sections[s.s].app ? '<span class="chip">Appendix</span>' : '<span class="chip main">Main</span>'}${esc(D.sections[s.s].name)}</div>${terms.length ? `<div class="snip">${snippet(s, terms)}</div>` : ""}</div>
     </div>`).join("");
 }
 function compact(ns){ // 5,6,7,9 -> 5–7, 9
