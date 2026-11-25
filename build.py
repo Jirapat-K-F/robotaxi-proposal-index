@@ -112,6 +112,8 @@ def build():
         rid2file[rid] = tgt
     order = [rid2file[r] for r in re.findall(r'<p:sldId [^>]*r:id="([^"]+)"', pres)]
 
+    ocr_file = Path(__file__).with_name("ocr.json")  # text for image-only slides
+    ocr = json.loads(ocr_file.read_text(encoding="utf8")) if ocr_file.exists() else {}
     starts = [s[0] for s in SECTIONS]
     slides = []
     for n, f in enumerate(order, 1):
@@ -128,7 +130,7 @@ def build():
         slides.append({
             "n": n,
             "t": title_of(xml, ps) or f"Slide {n}",
-            "x": " ".join(ps),
+            "x": " ".join(ps + [ocr.get(str(n), "")]).strip(),
             "notes": notes,
             "s": sec,
             "hidden": ' show="0"' in xml[:600],
